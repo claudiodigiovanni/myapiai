@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node main.js",
+    "debug": "node --debug server.js"
   },
   "author": "",
   "license": "ISC",
@@ -27,7 +29,9 @@
     "telebot": "1.0.7",
     "watson-developer-cloud": "2.18.0",
     "winston": "2.3.1",
-    "body-parser":"1.16.1",
-    "openweather-apis":"3.0.2"
+    "body-parser":"1.16.1"
+  },
+   "engines": {
+    "node": "6.7.0"
   }
 }

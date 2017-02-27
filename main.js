@@ -14,6 +14,8 @@ var api_ai = apiai("3ca80e39c4084a43a9c934025219c081");
 const TeleBot = require('telebot');
 var botToken = '365487370:AAEMiG9DrChu8R5rZar31jiLrFZCZZsqQmc'
 
+var chuck = require('chuck-norris-api');
+
 
 var sessionId = '99999999999-1'
 var apiai = require('apiai');
@@ -24,7 +26,7 @@ var myAppAi = apiai("3ca80e39c4084a43a9c934025219c081");
 const Speech = require('@google-cloud/speech');
 
 // Your Google Cloud Platform project ID
-const projectId = 'mybookingwithwatson';
+const projectId = 'myapiai-159818';
 
 // Instantiates a client
 const speechClient = Speech({
@@ -43,12 +45,14 @@ var config = {ApiserverAddress : 'http://localhost:3000',email:"claudio.digiovan
 
 
 const bot = new TeleBot(botToken);
+var parse = "Markdown"
 
 
 bot.on(['/start'], msg => {
 
   console.log("start...")
-  return bot.sendMessage(msg.from.id, "Benvenuto!");
+  bot.sendMessage(msg.from.id, "Benvenuto!");
+  bot.sendPhoto(msg.from.id,"steve.png")
   
 })
 
@@ -115,6 +119,7 @@ bot.on(['voice'], msg => {
                 languageCode: 'it-IT'
             };
             // Detects speech in the audio file
+            console.log("going to speech recognition........")
             return speechClient.recognize(msg.voice.file_id + ".wav", options)
     }).then((results) => {
             console.log(results)
@@ -136,7 +141,9 @@ bot.on(['voice'], msg => {
 
             apiRequest.end();
 
-    })
+    }).catch((error) => {
+                console.log(error)
+    });
 })
 
   
@@ -183,6 +190,12 @@ app.all('/*', function(req, res, next) {
   }
 });
 
+
+// Get method route
+app.get('/test', function (req, res) {
+    res.json({"data":"ok"})
+})
+
 // POST method route
 app.post('/webhook', function (req, res) {
     console.log("***************************WEBHOOK*********************************")
@@ -216,7 +229,33 @@ app.post('/webhook', function (req, res) {
                     "data": {aaa:'xxxx'},
                     "source": "book"
                 })
-            }) 
+            }).catch((error) => {
+                console.log(error)
+            }); 
+    }
+    else if (req.body.result.action == 'impegni'){
+            var date = new Date(); date.setHours(0); date.setMinutes(0); date.setSeconds(0);date.setMilliseconds(0)
+            findMyBookings(date,time,config.email).then(function(message){ 
+                res.json({
+                    "speech": message,
+                    "displayText": message,
+                    "data": {aaa:'xxxx'},
+                    "source": "impegni"
+                })
+            }).catch((error) => {
+                console.log(error)
+            }); 
+    }
+     else if (req.body.result.action == 'chuck'){
+            chuck.getRandom().then(function (data) {
+                console.log(data.value.joke);
+                res.json({
+                    "speech": data.value.joke,
+                    "displayText": data.value.joke,
+                    "data": {aaa:'xxxx'},
+                    "source": "chuck"
+                })
+            });
     }
 })
 
@@ -264,24 +303,49 @@ function createBooking(date,time,userEmail,court){
         } else{
           var okCourt = JSON.parse(body).data[0]
           var messageToAppend = ""
-          
-          if (court != null && JSON.parse(body).data.indexOf(court) != -1){
+          console.log('Elenco campi....')
+          console.log('valore court....' + court)
+          console.log(JSON.parse(body).data)
+          console.log(court  && JSON.parse(body).data.indexOf(parseInt(court)) != -1)
+          //Ho scelto il nome di un campo ed è disponibile...
+          if (court && JSON.parse(body).data.indexOf(parseInt(court)) != -1){
             okCourt = court
           }
           //Ho scelto il nome di un campo ma non è disponibile...
-          else if (court != null && court != '')
+          else if (court != null && court != '' && court != okCourt)
             messageToAppend = ". Scusa se ho prenotato il campo "  + courtsName[okCourt]  + " ma quello che avevi scelto non è disponibile!"
           
           var obj = {circolo : '56be660ae49818d0034c9edf', ranges : [slot1,slot1 + 1, slot1 +2], email: userEmail, gameType :  0, payed : false, 
           court: okCourt, date :  date}
           request.post({url: config.ApiserverAddress + '/botApi/v1/createBooking', form: {'book':obj}}, function(err,httpResponse,body){ 
-            if (err){
+            console.log('body.....');console.log(body)
+            if (err || JSON.parse(body).error){
               defer.resolve("Ops!!! Problemi durante la prenotazione.....")
             }
             else
               defer.resolve("Fatto! Giochi nel campo: " + courtsName[okCourt] + messageToAppend)
           })
         }
+    })
+    return defer.promise
+}
+
+function findMyBookings(date,time,userEmail){
+
+  var defer = Q.defer()
+  var form1 = {'date': date, 'userEmail': userEmail}
+
+  request.post({url: config.ApiserverAddress + '/botApi/v1/findMyBookings', form: form1}, function(err,httpResponse,body){ 
+    
+        
+        var ret = "*Ecco i tuoi impegni* \n"
+        var data =JSON.parse(body)
+        _.each(data.data,function(item){
+          ret += moment(item.startHour).format('DD/MM/YY HH:mm') + " - " + moment(item.endHour).format('HH:mm') + "\n"
+        })
+        if (data.data.length == 0) ret = "*Non hai nessun impegno.* Si batte la fiacca eh!"
+        defer.resolve(ret)
+        
     })
     return defer.promise
 }
